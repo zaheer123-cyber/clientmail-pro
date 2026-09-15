@@ -1,0 +1,355 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  workspace     Workspace?
+  accounts      Account[]
+  sessions      Session[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyProfile CompanyProfile?
+  clients        Client[]
+  emailTemplates EmailTemplate[]
+  emailAccounts  EmailAccount[]
+  emails         Email[]
+  campaigns      Campaign[]
+  scheduledEmails ScheduledEmail[]
+  userSettings   UserSettings?
+
+  @@map("workspaces")
+}
+
+model CompanyProfile {
+  id          String   @id @default(cuid())
+  workspaceId String   @unique
+  name        String   @default("Nexa Solutions")
+  logo        String?
+  email       String?
+  website     String?
+  phone       String?
+  address     String?
+  industry    String?  @default("Software & IT Solutions")
+  description String?  @db.Text
+  linkedIn    String?
+  twitter     String?
+  facebook    String?
+  signature   String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("company_profiles")
+}
+
+model Client {
+  id                 String       @id @default(cuid())
+  workspaceId        String
+  name               String
+  email              String
+  company            String?
+  position           String?
+  industry           String?
+  website            String?
+  phone              String?
+  location           String?
+  requirement        String?      @db.Text
+  notes              String?      @db.Text
+  status             ClientStatus @default(NEW)
+  tags               String[]
+  isVip              Boolean      @default(false)
+  lastContactedAt    DateTime?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  workspace        Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  emails           Email[]
+  campaignRecipients CampaignRecipient[]
+
+  @@unique([workspaceId, email])
+  @@map("clients")
+}
+
+enum ClientStatus {
+  NEW
+  CONTACTED
+  INTERESTED
+  FOLLOW_UP
+  CONVERTED
+  NOT_INTERESTED
+}
+
+model EmailTemplate {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  description String?
+  subject     String
+  body        String   @db.Text
+  category    String   @default("Custom")
+  language    String   @default("English")
+  tone        String   @default("Professional")
+  isFavorite  Boolean  @default(false)
+  useCount    Int      @default(0)
+  color       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  emails    Email[]
+  campaigns Campaign[]
+
+  @@map("email_templates")
+}
+
+model EmailAccount {
+  id           String          @id @default(cuid())
+  workspaceId  String
+  provider     EmailProvider
+  email        String
+  name         String?
+  accessToken  String?         @db.Text
+  refreshToken String?         @db.Text
+  expiresAt    DateTime?
+  smtpHost     String?
+  smtpPort     Int?
+  smtpUser     String?
+  smtpPassword String?         @db.Text
+  isDefault    Boolean         @default(false)
+  isActive     Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sentEmails      Email[]
+  campaigns       Campaign[]
+  scheduledEmails ScheduledEmail[]
+
+  @@unique([workspaceId, email])
+  @@map("email_accounts")
+}
+
+enum EmailProvider {
+  GMAIL
+  OUTLOOK
+  SMTP
+}
+
+model Email {
+  id              String      @id @default(cuid())
+  workspaceId     String
+  clientId        String?
+  templateId      String?
+  emailAccountId  String?
+  campaignId      String?
+  subject         String
+  body            String      @db.Text
+  recipientEmail  String
+  recipientName   String?
+  senderEmail     String?
+  senderName      String?
+  status          EmailStatus @default(DRAFT)
+  isDraft         Boolean     @default(false)
+  isScheduled     Boolean     @default(false)
+  scheduledAt     DateTime?
+  sentAt          DateTime?
+  openedAt        DateTime?
+  repliedAt       DateTime?
+  failureReason   String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  workspace    Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client       Client?        @relation(fields: [clientId], references: [id])
+  template     EmailTemplate? @relation(fields: [templateId], references: [id])
+  emailAccount EmailAccount?  @relation(fields: [emailAccountId], references: [id])
+  campaign     Campaign?      @relation(fields: [campaignId], references: [id])
+  attachments  EmailAttachment[]
+  events       EmailEvent[]
+
+  @@map("emails")
+}
+
+enum EmailStatus {
+  DRAFT
+  SCHEDULED
+  SENT
+  DELIVERED
+  OPENED
+  REPLIED
+  FAILED
+  BOUNCED
+}
+
+model EmailAttachment {
+  id        String   @id @default(cuid())
+  emailId   String
+  fileName  String
+  fileUrl   String
+  fileSize  Int?
+  mimeType  String?
+  createdAt DateTime @default(now())
+
+  email Email @relation(fields: [emailId], references: [id], onDelete: Cascade)
+
+  @@map("email_attachments")
+}
+
+model Campaign {
+  id             String         @id @default(cuid())
+  workspaceId    String
+  name           String
+  description    String?        @db.Text
+  templateId     String?
+  emailAccountId String?
+  status         CampaignStatus @default(DRAFT)
+  scheduledAt    DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  workspace    Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  template     EmailTemplate?      @relation(fields: [templateId], references: [id])
+  emailAccount EmailAccount?       @relation(fields: [emailAccountId], references: [id])
+  recipients   CampaignRecipient[]
+  emails       Email[]
+
+  @@map("campaigns")
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  PAUSED
+  COMPLETED
+  FAILED
+}
+
+model CampaignRecipient {
+  id         String   @id @default(cuid())
+  campaignId String
+  clientId   String
+  status     String   @default("PENDING")
+  sentAt     DateTime?
+  openedAt   DateTime?
+  repliedAt  DateTime?
+  createdAt  DateTime @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  client   Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, clientId])
+  @@map("campaign_recipients")
+}
+
+model ScheduledEmail {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  emailAccountId String?
+  recipientEmail String
+  recipientName  String?
+  subject        String
+  body           String   @db.Text
+  scheduledAt    DateTime
+  timezone       String   @default("UTC")
+  processed      Boolean  @default(false)
+  processedAt    DateTime?
+  failureReason  String?
+  createdAt      DateTime @default(now())
+
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  emailAccount EmailAccount? @relation(fields: [emailAccountId], references: [id])
+
+  @@map("scheduled_emails")
+}
+
+model EmailEvent {
+  id        String    @id @default(cuid())
+  emailId   String
+  type      String
+  metadata  Json?
+  createdAt DateTime  @default(now())
+
+  email Email @relation(fields: [emailId], references: [id], onDelete: Cascade)
+
+  @@map("email_events")
+}
+
+model UserSettings {
+  id                  String   @id @default(cuid())
+  workspaceId         String   @unique
+  defaultTone         String   @default("Professional")
+  defaultLanguage     String   @default("English")
+  defaultLength       String   @default("Medium")
+  personalizationLevel String  @default("High")
+  defaultSignature    String?  @db.Text
+  trackOpens          Boolean  @default(true)
+  trackClicks         Boolean  @default(true)
+  emailNotifications  Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
+}
