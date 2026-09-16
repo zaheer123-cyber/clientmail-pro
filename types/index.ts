@@ -25,6 +25,7 @@ export type CampaignStatus =
   | 'FAILED'
 
 export type EmailProvider = 'GMAIL' | 'OUTLOOK' | 'SMTP'
+export type EmailAccountStatus = 'CONNECTED' | 'ERROR' | 'DISCONNECTED'
 
 export interface Client {
   id: string
@@ -70,6 +71,7 @@ export interface EmailAccount {
   provider: EmailProvider
   email: string
   name?: string | null
+  status: EmailAccountStatus
   isDefault: boolean
   isActive: boolean
   createdAt: Date

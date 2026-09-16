@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { sendEmailViaAccount, bodyToHtml } from '@/services/email'
+import { getDecryptedAccount } from '@/services/providers'
 import { buildTemplateVariables, replaceTemplateVariables } from '@/lib/utils'
 import { z } from 'zod'
 
@@ -39,9 +40,7 @@ export async function POST(request: NextRequest) {
     const data = sendSchema.parse(body)
 
     // Get email account
-    const emailAccount = await prisma.emailAccount.findFirst({
-      where: { id: data.emailAccountId, workspaceId: workspace.id },
-    })
+    const emailAccount = await getDecryptedAccount(workspace.id, data.emailAccountId)
     if (!emailAccount) {
       return NextResponse.json({ error: 'Email account not found' }, { status: 404 })
     }
@@ -125,15 +124,7 @@ export async function POST(request: NextRequest) {
 
     // Send email now
     const htmlBody = bodyToHtml(processedBody, workspace.companyProfile?.signature || undefined)
-    const result = await sendEmailViaAccount(
-      {
-        ...emailAccount,
-        smtpHost: (emailAccount as Record<string, unknown>).smtpHost as string | null,
-        smtpPort: (emailAccount as Record<string, unknown>).smtpPort as number | null,
-        smtpUser: (emailAccount as Record<string, unknown>).smtpUser as string | null,
-        smtpPassword: (emailAccount as Record<string, unknown>).smtpPassword as string | null,
-        accessToken: (emailAccount as Record<string, unknown>).accessToken as string | null,
-      },
+    const result = await sendEmailViaAccount(emailAccount,
       {
         to: data.to,
         toName: data.toName,

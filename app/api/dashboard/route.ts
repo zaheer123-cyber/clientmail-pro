@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
@@ -7,7 +7,7 @@ async function getWorkspaceId(userId: string) {
   return ws?.id ?? null
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -65,14 +65,26 @@ export async function GET(request: NextRequest) {
     chartData.push({ date: dayNames[start.getDay()], opens, clicks, sent })
   }
 
-  // Recent campaigns
-  const recentCampaigns = await prisma.email.findMany({
+  const recentEmails = await prisma.email.findMany({
     where: { workspaceId },
     orderBy: { createdAt: 'desc' },
     take: 6,
     include: {
       client: { select: { name: true, company: true } },
       template: { select: { name: true } },
+    },
+  })
+
+  const recentCampaigns = await prisma.campaign.findMany({
+    where: { workspaceId },
+    orderBy: { createdAt: 'desc' },
+    take: 3,
+    select: {
+      id: true,
+      name: true,
+      status: true,
+      scheduledAt: true,
+      _count: { select: { recipients: true, emails: true } },
     },
   })
 
@@ -88,6 +100,7 @@ export async function GET(request: NextRequest) {
       clientsChange: parseFloat(clientsChange),
     },
     chartData,
+    recentEmails,
     recentCampaigns,
   })
 }

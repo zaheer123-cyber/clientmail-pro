@@ -21,6 +21,7 @@ model User {
   updatedAt     DateTime  @updatedAt
 
   workspace     Workspace?
+  emailAccounts EmailAccount[]
   accounts      Account[]
   sessions      Session[]
 
@@ -163,9 +164,15 @@ model EmailTemplate {
 model EmailAccount {
   id           String          @id @default(cuid())
   workspaceId  String
+  userId       String?
   provider     EmailProvider
   email        String
   name         String?
+  status       EmailAccountStatus @default(CONNECTED)
+  encryptedAccessToken  String? @db.Text
+  encryptedRefreshToken String? @db.Text
+  encryptedSmtpPassword String? @db.Text
+  smtpSecurity String? @default("STARTTLS")
   accessToken  String?         @db.Text
   refreshToken String?         @db.Text
   expiresAt    DateTime?
@@ -179,11 +186,14 @@ model EmailAccount {
   updatedAt    DateTime        @updatedAt
 
   workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user            User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
   sentEmails      Email[]
   campaigns       Campaign[]
   scheduledEmails ScheduledEmail[]
 
   @@unique([workspaceId, email])
+  @@index([workspaceId, status])
+  @@index([userId])
   @@map("email_accounts")
 }
 
@@ -191,6 +201,12 @@ enum EmailProvider {
   GMAIL
   OUTLOOK
   SMTP
+}
+
+enum EmailAccountStatus {
+  CONNECTED
+  ERROR
+  DISCONNECTED
 }
 
 model Email {

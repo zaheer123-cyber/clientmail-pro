@@ -3,17 +3,19 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts'
 import { getInitials, generateAvatarColor, formatDate } from '@/lib/utils'
 
 interface DashboardStats {
-  totalEmails: number
-  deliveredEmails: number
-  openedEmails: number
-  repliedEmails: number
-  scheduledCount: number
-  clientCount: number
+  emailsSentThisMonth: number
+  averageOpenRate: number
+  averageClickRate: number
+  activeClients: number
+  emailsChange: number
+  openRateChange: number
+  clickRateChange: number
+  clientsChange: number
 }
 
 interface RecentEmail {
@@ -27,27 +29,35 @@ interface RecentEmail {
   client?: { name: string; company: string | null }
 }
 
-const chartData = [
-  { day: 'Mon', sent: 45, opened: 32, replied: 14 },
-  { day: 'Tue', sent: 68, opened: 54, replied: 22 },
-  { day: 'Wed', sent: 92, opened: 71, replied: 35 },
-  { day: 'Thu', sent: 110, opened: 88, replied: 41 },
-  { day: 'Fri', sent: 85, opened: 65, replied: 28 },
-  { day: 'Sat', sent: 30, opened: 21, replied: 8 },
-  { day: 'Sun', sent: 25, opened: 18, replied: 6 },
-]
+interface ChartPoint {
+  date: string
+  opens: number
+  clicks: number
+  sent: number
+}
+
+interface CampaignSummary {
+  id: string
+  name: string
+  status: string
+  scheduledAt: string | null
+  _count: { recipients: number; emails: number }
+}
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats>({
-    totalEmails: 1482,
-    deliveredEmails: 1340,
-    openedEmails: 890,
-    repliedEmails: 420,
-    scheduledCount: 124,
-    clientCount: 86,
+    emailsSentThisMonth: 0,
+    averageOpenRate: 0,
+    averageClickRate: 0,
+    activeClients: 0,
+    emailsChange: 0,
+    openRateChange: 0,
+    clickRateChange: 0,
+    clientsChange: 0,
   })
   const [recentEmails, setRecentEmails] = useState<RecentEmail[]>([])
-  const [loading, setLoading] = useState(true)
+  const [campaigns, setCampaigns] = useState<CampaignSummary[]>([])
+  const [chartData, setChartData] = useState<ChartPoint[]>([])
 
   useEffect(() => {
     async function fetchDashboard() {
@@ -57,70 +67,15 @@ export default function DashboardPage() {
           const data = await res.json()
           if (data.stats) setStats(data.stats)
           if (data.recentEmails) setRecentEmails(data.recentEmails)
+          if (data.recentCampaigns) setCampaigns(data.recentCampaigns)
+          if (data.chartData) setChartData(data.chartData)
         }
       } catch (err) {
         console.error('Failed to fetch dashboard data:', err)
-      } finally {
-        setLoading(false)
       }
     }
     fetchDashboard()
   }, [])
-
-  const sampleRecentEmails: RecentEmail[] = [
-    {
-      id: '1',
-      recipientName: 'Sarah Jenkins',
-      recipientEmail: 'sarah.j@techcorp.io',
-      subject: 'Custom Cloud Architecture & Scalability Solutions for TechCorp',
-      status: 'OPENED',
-      sentAt: new Date(Date.now() - 3600000).toISOString(),
-      createdAt: new Date().toISOString(),
-      client: { name: 'Sarah Jenkins', company: 'TechCorp Solutions' }
-    },
-    {
-      id: '2',
-      recipientName: 'Michael Chang',
-      recipientEmail: 'mchang@innovate.co',
-      subject: 'Re: Enterprise Software Development Proposal',
-      status: 'REPLIED',
-      sentAt: new Date(Date.now() - 7200000).toISOString(),
-      createdAt: new Date().toISOString(),
-      client: { name: 'Michael Chang', company: 'Innovate Co' }
-    },
-    {
-      id: '3',
-      recipientName: 'Elena Rostova',
-      recipientEmail: 'elena@cyberdefense.net',
-      subject: 'Cybersecurity Audit & Compliance Readiness',
-      status: 'SENT',
-      sentAt: new Date(Date.now() - 14400000).toISOString(),
-      createdAt: new Date().toISOString(),
-      client: { name: 'Elena Rostova', company: 'CyberDefense' }
-    },
-    {
-      id: '4',
-      recipientName: 'David Miller',
-      recipientEmail: 'dmiller@apexlogistics.com',
-      subject: 'AI Automated Workflow Integration Demonstration',
-      status: 'OPENED',
-      sentAt: new Date(Date.now() - 28800000).toISOString(),
-      createdAt: new Date().toISOString(),
-      client: { name: 'David Miller', company: 'Apex Logistics' }
-    },
-    {
-      id: '5',
-      recipientName: 'Amanda Lewis',
-      recipientEmail: 'alewis@fintechhub.com',
-      subject: 'Custom Mobile Application Development Services',
-      status: 'SCHEDULED',
-      sentAt: null,
-      createdAt: new Date().toISOString(),
-      client: { name: 'Amanda Lewis', company: 'Fintech Hub' }
-    },
-  ]
-
-  const displayEmails = recentEmails.length > 0 ? recentEmails : sampleRecentEmails
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -179,9 +134,9 @@ export default function DashboardPage() {
               </svg>
             </div>
           </div>
-          <div className="metric-value">{stats.totalEmails.toLocaleString()}</div>
+          <div className="metric-value">{stats.emailsSentThisMonth.toLocaleString()}</div>
           <div className="metric-change positive">
-            <span>↑ 12.5%</span> vs last month
+            <span>{stats.emailsChange >= 0 ? '↑' : '↓'} {Math.abs(stats.emailsChange)}%</span> vs last month
           </div>
         </div>
 
@@ -195,9 +150,9 @@ export default function DashboardPage() {
               </svg>
             </div>
           </div>
-          <div className="metric-value">{stats.deliveredEmails.toLocaleString()}</div>
+          <div className="metric-value">{stats.averageOpenRate}%</div>
           <div className="metric-change positive">
-            <span>90.4%</span> delivery rate
+            <span>Open rate</span> from tracked emails
           </div>
         </div>
 
@@ -212,10 +167,10 @@ export default function DashboardPage() {
             </div>
           </div>
           <div className="metric-value">
-            {((stats.repliedEmails / (stats.totalEmails || 1)) * 100).toFixed(1)}%
+            {stats.averageClickRate}%
           </div>
           <div className="metric-change positive">
-            <span>↑ 4.1%</span> engagement boost
+            <span>{stats.clickRateChange >= 0 ? '↑' : '↓'} {Math.abs(stats.clickRateChange)}%</span> reply rate change
           </div>
         </div>
 
@@ -229,9 +184,9 @@ export default function DashboardPage() {
               </svg>
             </div>
           </div>
-          <div className="metric-value">{stats.scheduledCount}</div>
+          <div className="metric-value">{stats.activeClients}</div>
           <div style={{ fontSize: '12px', color: '#64748b', marginTop: '6px' }}>
-            Ready for automated dispatch
+            Active clients in this workspace
           </div>
         </div>
       </div>
@@ -264,14 +219,14 @@ export default function DashboardPage() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="day" stroke="#94a3b8" fontSize={12} tickLine={false} />
+                <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} tickLine={false} />
                 <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                 <Tooltip
                   contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: 'white' }}
                   itemStyle={{ color: '#e2e8f0' }}
                 />
                 <Area type="monotone" dataKey="sent" stroke="#2563eb" strokeWidth={2} fillOpacity={1} fill="url(#colorSent)" />
-                <Area type="monotone" dataKey="opened" stroke="#22c55e" strokeWidth={2} fillOpacity={1} fill="url(#colorOpened)" />
+                <Area type="monotone" dataKey="opens" stroke="#22c55e" strokeWidth={2} fillOpacity={1} fill="url(#colorOpened)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -285,44 +240,19 @@ export default function DashboardPage() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>SaaS Tech Outreach Q4</span>
-                <span className="badge badge-green">Active</span>
+            {campaigns.length === 0 ? (
+              <p style={{ fontSize: '13px', color: '#64748b' }}>No campaigns in this workspace yet.</p>
+            ) : campaigns.map(campaign => (
+              <div key={campaign.id} style={{ padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>{campaign.name}</span>
+                  {getStatusBadge(campaign.status)}
+                </div>
+                <div style={{ fontSize: '12px', color: '#64748b' }}>
+                  {campaign._count.recipients} recipients • {campaign._count.emails} emails
+                </div>
               </div>
-              <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '8px' }}>
-                48 / 120 Emails sent • 65% Open Rate
-              </div>
-              <div style={{ width: '100%', background: '#e2e8f0', borderRadius: '4px', height: '6px' }}>
-                <div style={{ width: '40%', background: '#2563eb', height: '100%', borderRadius: '4px' }} />
-              </div>
-            </div>
-
-            <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>IT Infra Upgrade Audit</span>
-                <span className="badge badge-yellow">Scheduled</span>
-              </div>
-              <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '8px' }}>
-                Launches tomorrow at 09:00 AM • 45 clients
-              </div>
-              <div style={{ width: '100%', background: '#e2e8f0', borderRadius: '4px', height: '6px' }}>
-                <div style={{ width: '0%', background: '#ca8a04', height: '100%', borderRadius: '4px' }} />
-              </div>
-            </div>
-
-            <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>Enterprise Custom Software</span>
-                <span className="badge badge-blue">Completed</span>
-              </div>
-              <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '8px' }}>
-                250 / 250 Sent • 78% Delivered • 42 Replies
-              </div>
-              <div style={{ width: '100%', background: '#e2e8f0', borderRadius: '4px', height: '6px' }}>
-                <div style={{ width: '100%', background: '#22c55e', height: '100%', borderRadius: '4px' }} />
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </div>
@@ -354,7 +284,9 @@ export default function DashboardPage() {
             </tr>
           </thead>
           <tbody>
-            {displayEmails.map(item => {
+            {recentEmails.length === 0 ? (
+              <tr><td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: '#64748b' }}>No outreach activity in this workspace yet.</td></tr>
+            ) : recentEmails.map(item => {
               const name = item.client?.name || item.recipientName || 'Client'
               const company = item.client?.company || 'N/A'
               const colorClass = generateAvatarColor(name)
